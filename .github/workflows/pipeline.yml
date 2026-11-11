@@ -1,5 +1,5 @@
 
-name: DevOps Change
+name: DevOps Change Gate
 
 on:
   push:
