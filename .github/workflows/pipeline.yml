@@ -1,1 +1,119 @@
 
+name: DevOps Change
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Runs mannualy too
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+  
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set Node.js 24.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+
+    # - name: Install dependencies
+      # run: npm ci
+
+    # - name: Compile
+      # run: npm run build
+
+  sonarqube:
+    name: SonarQube
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          
+      - name: Cache SonarQube packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+          
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Send Sonar results to ServiceNow
+        uses: ServiceNow/servicenow-devops-sonar@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'SonarQube'
+          sonar-host-url: ${{ secrets.SONAR_URL }}
+          sonar-project-key: ${{ secrets.SONAR_PROJECT_KEY }}
+
+  change:
+    name: Change
+    needs: sonarqube
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Define change window
+        id: window
+        run: |
+          echo "start=$(date -u -d '+2 minutes' '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT" # minute/minutes, hour/hours, day/days
+          echo "end=$(date -u -d '+10 minutes' '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT" # minute/minutes, hour/hours, day/days
+
+      - name: Output of Window Definition
+        run: echo "start = ${{ steps.window.outputs.start }} and end = ${{ steps.window.outputs.end }} " >> $GITHUB_OUTPUT
+
+      - name: ServiceNow Change Approval
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        id: create
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Change'
+          change-request: |
+            {
+              "setCloseCode":"true",
+              "attributes": {
+                "category":"DevOps",
+                "u_release":{"number": "RLSE0010001"},
+                "cmdb_ci":{"name": "claude-opus-4-8"},
+                "assignment_group":"a715cd759f2002002920bde8132e7018",
+                "start_date": "${{ steps.window.outputs.start }}",
+                "end_date": "${{ steps.window.outputs.end }}"
+              }
+            }
+          interval: '100'                     # intervalo entre consultas (segundos)
+          timeout: '3600'                     # espera máxima pela aprovação (1h)
+          changeCreationTimeOut: '3600'       # espera máxima para criar a mudança (1h)
+          abortOnChangeCreationFailure: true  # interrompe se a mudança não for criada
+          abortOnChangeStepTimeout: true      # interrompe se a aprovação demorar demais
+
+      - name: Output of Change Creation
+        run: echo "change-request-number = ${{ steps.create.outputs.change-request-number }} and change-request-sys-id = ${{ steps.create.outputs.change-request-sys-id }} " >> $GITHUB_OUTPUT
+
+  deploy:
+    name: Deploy
+    needs: change
+    runs-on: ubuntu-latest
+
+    steps:     
+      - name: Run Deployment Script
+        run: echo "Deployment Finished....."
