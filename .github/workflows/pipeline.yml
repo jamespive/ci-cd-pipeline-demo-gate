@@ -110,7 +110,7 @@ jobs:
         run: echo "change-request-number = ${{ steps.create.outputs.change-request-number }} and change-request-sys-id = ${{ steps.create.outputs.change-request-sys-id }} " >> $GITHUB_OUTPUT
 
   deploy:
-    name: 'Deploy'
+    name: Deploy
     needs: change
     runs-on: ubuntu-latest
     # environment: deployment_gate
