@@ -10,9 +10,11 @@ jobs:
     uses: jamespive/ci-cd-pipeline-demo-gate/.github/workflows/deploy-reusable.yml@main
     with:
       environment: staging
+    secrets: inherit
 
   deploy-prod:
     needs: deploy-staging
     uses: jamespive/ci-cd-pipeline-demo-gate/.github/workflows/deploy-reusable.yml@main
     with:
       environment: production        # requires approval
+    secrets: inherit
