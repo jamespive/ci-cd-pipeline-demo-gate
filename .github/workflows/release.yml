@@ -10,13 +10,9 @@ jobs:
     uses: jamespive/ci-cd-pipeline-demo-gate/.github/workflows/deploy-reusable.yml@main
     with:
       environment: staging
-    secrets:
-      DEPLOY_TOKEN: ${{ secrets.STAGING_TOKEN }}
 
   deploy-prod:
     needs: deploy-staging
     uses: jamespive/ci-cd-pipeline-demo-gate/.github/workflows/deploy-reusable.yml@main
     with:
       environment: production        # requires approval
-    secrets:
-      DEPLOY_TOKEN: ${{ secrets.PROD_TOKEN }}
