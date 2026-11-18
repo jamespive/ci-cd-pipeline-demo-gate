@@ -12,10 +12,6 @@ on:
         type: string
         default: latest
         
-    secrets:
-      DEPLOY_TOKEN:
-        required: true
-        
     outputs:
       deployed_version:
         value: ${{ jobs.deploy.outputs.version }}
