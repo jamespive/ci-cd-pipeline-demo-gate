@@ -4,22 +4,25 @@ on:
   workflow_call:
     outputs:
       firstword:
-        description: "The first output string"
-        value: ${{ jobs.example_job.outputs.output1 }}
+        description: "The first output"
+        value: ${{ jobs.generate.outputs.output1 }}
       secondword:
-        description: "The second output string"
-        value: ${{ jobs.example_job.outputs.output2 }}
+        description: "The second output"
+        value: ${{ jobs.generate.outputs.output2 }}
 
 jobs:
-  example_job:
+
+  generate:
     name: Generate output
     runs-on: ubuntu-latest
 
     outputs:
-      output1: ${{ steps.step1.outputs.firstword }}
-      output2: ${{ steps.step2.outputs.secondword }}
+      output1: ${{ steps.output1.outputs.firstword }}
+      output2: ${{ steps.output2.outputs.secondword }}
+
     steps:
-      - id: step1
+      - id: output1
         run: echo "firstword=hello" >> $GITHUB_OUTPUT
-      - id: step2
+        
+      - id: output2
         run: echo "secondword=world" >> $GITHUB_OUTPUT
