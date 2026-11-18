@@ -18,6 +18,7 @@ on:
 
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
     
     steps:
@@ -35,10 +36,49 @@ jobs:
       # - name: Compile
         # run: npm run build
 
-  deploy:
+  change-gate:
+    name: ServiceNow Change
     needs: build
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}   # <-- the gate triggers here
+    steps:
+      
+      - name: Define change window
+        id: window
+        run: |
+          echo "start=$(date -u -d '+2 minutes' '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT" # minute/minutes, hour/hours, day/days
+          echo "end=$(date -u -d '+10 minutes' '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT" # minute/minutes, hour/hours, day/days
+          
+      - name: Create change and wait for approval
+        uses: ServiceNow/servicenow-devops-change@v6.1.0   # check marketplace for latest
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow Change'          # must match the job's name exactly
+          change-request: |
+            {
+              "setCloseCode":"true",
+              "attributes": {
+                "category":"DevOps",
+                "u_release":{"number": "RLSE0010001"},
+                "cmdb_ci":{"name": "claude-opus-4-8"},
+                "assignment_group":"a715cd759f2002002920bde8132e7018",
+                "start_date": "${{ steps.window.outputs.start }}",
+                "end_date": "${{ steps.window.outputs.end }}"
+              }
+            }
+          interval: '100'                     # intervalo entre consultas (segundos)
+          timeout: '3600'                     # espera máxima pela aprovação (1h)
+          changeCreationTimeOut: '3600'       # espera máxima para criar a mudança (1h)
+          abortOnChangeCreationFailure: true  # interrompe se a mudança não for criada
+          abortOnChangeStepTimeout: true      # interrompe se a aprovação demorar demais
+
+  deploy:
+    name: Deploy
+    needs: change-gate           # only runs once the change is approved
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     
     outputs:
       version: ${{ inputs.version }}
